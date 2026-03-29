@@ -1,0 +1,138 @@
+# =========================
+# 1. IMPORT LIBRARIES
+# =========================
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+
+# =========================
+# 2. LOAD DATASET
+# =========================
+df = pd.read_csv("your_dataset.csv")   # <-- change file name if needed
+
+print("Dataset Shape:", df.shape)
+print(df.head())
+
+# =========================
+# 3. DATA PREPROCESSING
+# =========================
+
+# Drop duplicates
+df.drop_duplicates(inplace=True)
+
+# Handle missing values
+df.fillna(df.mean(numeric_only=True), inplace=True)
+
+# Select numerical features (audio features)
+features = df.select_dtypes(include=np.number)
+
+print("\nFeatures Used:\n", features.columns)
+
+# =========================
+# 4. DATA ANALYSIS & VISUALIZATION
+# =========================
+
+# Distribution plots
+features.hist(figsize=(15,10))
+plt.suptitle("Feature Distributions")
+plt.show()
+
+# Pairplot (for sample)
+sns.pairplot(features.sample(200))
+plt.show()
+
+# =========================
+# 5. CORRELATION MATRIX
+# =========================
+plt.figure(figsize=(12,8))
+corr = features.corr()
+
+sns.heatmap(corr, annot=True, cmap="coolwarm")
+plt.title("Correlation Matrix")
+plt.show()
+
+# =========================
+# 6. SCALING DATA
+# =========================
+scaler = StandardScaler()
+scaled_data = scaler.fit_transform(features)
+
+# =========================
+# 7. FIND OPTIMAL CLUSTERS (ELBOW METHOD)
+# =========================
+wcss = []
+
+for i in range(1, 11):
+    kmeans = KMeans(n_clusters=i, random_state=42)
+    kmeans.fit(scaled_data)
+    wcss.append(kmeans.inertia_)
+
+plt.plot(range(1,11), wcss, marker='o')
+plt.title("Elbow Method")
+plt.xlabel("Number of Clusters")
+plt.ylabel("WCSS")
+plt.show()
+
+# =========================
+# 8. APPLY KMEANS CLUSTERING
+# =========================
+kmeans = KMeans(n_clusters=5, random_state=42)
+clusters = kmeans.fit_predict(scaled_data)
+
+df['Cluster'] = clusters
+
+# =========================
+# 9. PCA FOR VISUALIZATION
+# =========================
+pca = PCA(n_components=2)
+pca_data = pca.fit_transform(scaled_data)
+
+df['PCA1'] = pca_data[:,0]
+df['PCA2'] = pca_data[:,1]
+
+# Plot clusters
+plt.figure(figsize=(10,6))
+sns.scatterplot(x='PCA1', y='PCA2', hue='Cluster', data=df, palette='viridis')
+plt.title("Clusters Visualization (PCA)")
+plt.show()
+
+# =========================
+# 10. CLUSTER ANALYSIS BY GENRE
+# =========================
+if 'playlist_genre' in df.columns:
+    plt.figure(figsize=(10,6))
+    sns.countplot(x='playlist_genre', hue='Cluster', data=df)
+    plt.xticks(rotation=45)
+    plt.title("Clusters by Playlist Genre")
+    plt.show()
+
+# =========================
+# 11. CLUSTER ANALYSIS BY PLAYLIST NAME
+# =========================
+if 'playlist_name' in df.columns:
+    top_playlists = df['playlist_name'].value_counts().head(10).index
+    filtered_df = df[df['playlist_name'].isin(top_playlists)]
+
+    plt.figure(figsize=(12,6))
+    sns.countplot(x='playlist_name', hue='Cluster', data=filtered_df)
+    plt.xticks(rotation=45)
+    plt.title("Clusters by Playlist Name")
+    plt.show()
+
+# =========================
+# 12. SIMPLE RECOMMENDATION SYSTEM
+# =========================
+
+def recommend(song_index):
+    cluster = df.iloc[song_index]['Cluster']
+    recommendations = df[df['Cluster'] == cluster].sample(5)
+    return recommendations[['track_name', 'playlist_name', 'playlist_genre']]
+
+# Example usage
+print("\nRecommended Songs:\n")
+print(recommend(10))   # change index as needed
